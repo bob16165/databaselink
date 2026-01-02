@@ -184,3 +184,20 @@ export async function getLoginHistory(userId: number, limit: number = 10) {
   if (error) throw error;
   return data || [];
 }
+
+// 全ログイン履歴取得（管理者用）
+export async function getAllLoginHistory(limit: number = 100) {
+  const { data, error } = await supabase
+    .from('login_history')
+    .select(`
+      *,
+      users!inner (
+        full_name
+      )
+    `)
+    .order('login_time', { ascending: false })
+    .limit(limit);
+  
+  if (error) throw error;
+  return data || [];
+}

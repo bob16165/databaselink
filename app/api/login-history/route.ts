@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { getLoginHistory } from '@/lib/models-supabase';
+import { getLoginHistory, getAllLoginHistory, getUserByUsername } from '@/lib/models-supabase';
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,9 +15,21 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '10');
+    const limit = parseInt(searchParams.get('limit') || '100');
+    const all = searchParams.get('all') === 'true';
 
-    // 自分のログイン履歴を取得
+    // 管理者の場合は全ログイン履歴を取得
+    if (all) {
+      const user = await getUserByUsername(payload.username);
+      if (!user || user.username !== 'admin') {
+        return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 });
+      }
+      
+      const history = await getAllLoginHistory(limit);
+      return NextResponse.json({ history });
+    }
+
+    // 一般ユーザーは自分のログイン履歴のみ
     const history = await getLoginHistory(payload.userId, limit);
 
     return NextResponse.json({ history });

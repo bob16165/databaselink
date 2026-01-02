@@ -354,7 +354,8 @@ export default function AdminPage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [users, setUsers] = useState<DBUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'articles' | 'users' | 'links'>('articles');
+  const [activeTab, setActiveTab] = useState<'articles' | 'users' | 'links' | 'login-history'>('articles');
+  const [loginHistory, setLoginHistory] = useState<any[]>([]);
 
   // 記事追加フォーム
   const [newArticle, setNewArticle] = useState({ 
@@ -390,12 +391,12 @@ export default function AdminPage() {
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
 
-  // カテゴリー一覧（学年-クラス形式）
+  // カテゴリー一覧（学年のみ＋学年-クラス形式）
   const categories = [
     '共通',
-    '1年-A', '1年-B', '1年-C',
-    '2年-A', '2年-B', '2年-C',
-    '3年-A', '3年-B', '3年-C'
+    '1年', '1年-A', '1年-B', '1年-C',
+    '2年', '2年-A', '2年-B', '2年-C',
+    '3年', '3年-A', '3年-B', '3年-C'
   ];
 
   // ドラッグ&ドロップセンサー
@@ -420,6 +421,7 @@ export default function AdminPage() {
         fetchArticles();
         fetchUsers();
         fetchLinks();
+        fetchLoginHistory();
       } else {
         router.push('/');
       }
@@ -459,6 +461,48 @@ export default function AdminPage() {
     } catch (error) {
       console.error('Links fetch error:', error);
     }
+  };
+
+  const fetchLoginHistory = async () => {
+    try {
+      const response = await fetch('/api/login-history?all=true&limit=500');
+      const data = await response.json();
+      setLoginHistory(data.history || []);
+    } catch (error) {
+      console.error('Login history fetch error:', error);
+    }
+  };
+
+  const downloadLoginHistoryCSV = () => {
+    // CSVヘッダー
+    const headers = ['ログイン日時', '学生名（保護者名）', 'ユーザー名'];
+    
+    // CSVデータ行
+    const rows = loginHistory.map((history) => {
+      const loginTime = new Date(history.login_time).toLocaleString('ja-JP');
+      const fullName = history.users?.full_name || history.username;
+      return [loginTime, fullName, history.username];
+    });
+    
+    // CSVコンテンツ作成
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+    
+    // BOM付きでダウンロード（Excel対応）
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    const timestamp = new Date().toISOString().slice(0, 10);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `login_history_${timestamp}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleAddArticle = async (e: React.FormEvent) => {
@@ -861,6 +905,16 @@ export default function AdminPage() {
               }`}
             >
               アクセスリンク管理
+            </button>
+            <button
+              onClick={() => setActiveTab('login-history')}
+              className={`pb-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'login-history'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              ログイン履歴
             </button>
           </nav>
         </div>
@@ -1302,6 +1356,79 @@ export default function AdminPage() {
                 アクセスリンクがありません。新規追加してください。
               </div>
             )}
+          </div>
+        )}
+
+        {/* ログイン履歴 */}
+        {activeTab === 'login-history' && (
+          <div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <h2 className="text-lg font-semibold text-gray-900">ログイン履歴</h2>
+                <button
+                  onClick={downloadLoginHistoryCSV}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium"
+                >
+                  CSVダウンロード
+                </button>
+              </div>
+              
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        ログイン日時
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        学生名（保護者名）
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        ユーザー名
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {loginHistory.length > 0 ? (
+                      loginHistory.map((history, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {new Date(history.login_time).toLocaleString('ja-JP', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit'
+                            })}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {history.users?.full_name || history.username}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {history.username}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
+                          ログイン履歴がありません
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              
+              {loginHistory.length > 0 && (
+                <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                  <p className="text-sm text-gray-600">
+                    合計 <span className="font-semibold">{loginHistory.length}</span> 件のログイン履歴
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>
