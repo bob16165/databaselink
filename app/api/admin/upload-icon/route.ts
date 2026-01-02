@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
 import { verifyToken } from '@/lib/auth';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,14 +49,26 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // public/iconsディレクトリに保存
-    const path = join(process.cwd(), 'public', 'icons', filename);
-    await writeFile(path, buffer);
+    // Supabase Storageにアップロード
+    const { data, error } = await supabase.storage
+      .from('icons')
+      .upload(filename, buffer, {
+        contentType: file.type,
+        cacheControl: '3600',
+        upsert: false
+      });
 
-    // 公開URLを返す
-    const iconUrl = `/icons/${filename}`;
+    if (error) {
+      console.error('Supabase upload error:', error);
+      return NextResponse.json({ error: 'アップロードに失敗しました' }, { status: 500 });
+    }
 
-    return NextResponse.json({ iconUrl }, { status: 200 });
+    // 公開URLを取得
+    const { data: urlData } = supabase.storage
+      .from('icons')
+      .getPublicUrl(filename);
+
+    return NextResponse.json({ iconUrl: urlData.publicUrl }, { status: 200 });
   } catch (error) {
     console.error('Icon upload error:', error);
     return NextResponse.json({ error: 'アップロードに失敗しました' }, { status: 500 });

@@ -37,4 +37,4 @@ next-env.d.ts
 # database
 *.db
 *.db-journal
-*.json
+database.json

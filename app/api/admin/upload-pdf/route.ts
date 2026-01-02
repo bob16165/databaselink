@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
 import { verifyToken } from '@/lib/auth';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,15 +42,30 @@ export async function POST(request: NextRequest) {
     const originalName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
     const fileName = `${timestamp}_${originalName}`;
 
-    // ファイルを保存
+    // ファイルをバッファに変換
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const path = join(process.cwd(), 'public', 'documents', fileName);
-    await writeFile(path, buffer);
 
-    const pdfUrl = `/documents/${fileName}`;
+    // Supabase Storageにアップロード
+    const { data, error } = await supabase.storage
+      .from('documents')
+      .upload(fileName, buffer, {
+        contentType: 'application/pdf',
+        cacheControl: '3600',
+        upsert: false
+      });
 
-    return NextResponse.json({ pdfUrl, fileName: originalName });
+    if (error) {
+      console.error('Supabase upload error:', error);
+      return NextResponse.json({ error: 'アップロードに失敗しました' }, { status: 500 });
+    }
+
+    // 公開URLを取得
+    const { data: urlData } = supabase.storage
+      .from('documents')
+      .getPublicUrl(fileName);
+
+    return NextResponse.json({ pdfUrl: urlData.publicUrl, fileName: originalName });
   } catch (error) {
     console.error('PDF upload error:', error);
     return NextResponse.json({ error: 'アップロードに失敗しました' }, { status: 500 });
