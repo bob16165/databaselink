@@ -157,8 +157,8 @@ export async function updateArticle(
 export async function recordLoginHistory(
   userId: number,
   username: string,
-  ipAddress: string,
-  userAgent: string
+  ipAddress: string | null,
+  userAgent: string | null
 ) {
   const { error } = await supabase
     .from('login_history')

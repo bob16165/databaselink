@@ -14,6 +14,7 @@ interface Article {
   title: string;
   content: string;
   author: string;
+  documents?: { name: string; url: string }[];
   created_at: string;
 }
 
