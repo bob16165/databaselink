@@ -521,10 +521,12 @@ export default function AdminPage() {
         alert('記事を追加しました');
       } else {
         const data = await response.json();
-        alert(data.error || '追加に失敗しました');
+        console.error('記事追加エラー:', data);
+        alert(`記事の追加に失敗しました: ${data.error || '不明なエラー'}`);
       }
     } catch (error) {
-      alert('エラーが発生しました');
+      console.error('記事追加エラー:', error);
+      alert(`エラーが発生しました: ${error instanceof Error ? error.message : '不明なエラー'}`);
     }
   };
 
