@@ -80,7 +80,7 @@ export async function deleteUser(id: number) {
   if (error) throw error;
 }
 
-// 記事作成（documentsカラムなしバージョン）
+// 記事作成
 export async function createArticle(
   title: string,
   content: string,
@@ -93,6 +93,7 @@ export async function createArticle(
       title,
       content,
       author,
+      documents: documents || [],
     })
     .select()
     .single();

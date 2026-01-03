@@ -2,13 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
 export async function POST(request: NextRequest) {
   try {
+    // 環境変数チェック
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Missing environment variables:', {
+        url: !!supabaseUrl,
+        key: !!supabaseKey
+      });
+      return NextResponse.json({ 
+        error: 'サーバー設定エラー: Supabase環境変数が設定されていません' 
+      }, { status: 500 });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
     // 認証確認
     const token = request.cookies.get('auth-token')?.value;
     if (!token) {
@@ -56,8 +67,14 @@ export async function POST(request: NextRequest) {
       });
 
     if (error) {
-      console.error('Supabase upload error:', error);
-      return NextResponse.json({ error: 'アップロードに失敗しました' }, { status: 500 });
+      console.error('Supabase upload error:', {
+        message: error.message,
+        statusCode: error.statusCode,
+        error: error
+      });
+      return NextResponse.json({ 
+        error: `アップロードに失敗しました: ${error.message}` 
+      }, { status: 500 });
     }
 
     // 公開URLを取得
@@ -67,7 +84,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ pdfUrl: urlData.publicUrl, fileName: originalName });
   } catch (error) {
-    console.error('PDF upload error:', error);
-    return NextResponse.json({ error: 'アップロードに失敗しました' }, { status: 500 });
+    console.error('PDF upload error:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      error
+    });
+    return NextResponse.json({ 
+      error: `アップロードに失敗しました: ${error instanceof Error ? error.message : '不明なエラー'}` 
+    }, { status: 500 });
   }
 }
