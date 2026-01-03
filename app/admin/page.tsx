@@ -827,10 +827,12 @@ export default function AdminPage() {
         alert(`PDFをアップロードしました: ${docName}`);
       } else {
         const data = await response.json();
+        console.error('Upload failed:', { status: response.status, data });
         alert(data.error || 'アップロードに失敗しました');
       }
     } catch (error) {
-      alert('エラーが発生しました');
+      console.error('Upload error:', error);
+      alert(`エラーが発生しました: ${error instanceof Error ? error.message : '不明なエラー'}`);
     } finally {
       setUploadingPdf(false);
     }
