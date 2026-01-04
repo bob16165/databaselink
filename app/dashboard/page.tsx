@@ -31,6 +31,7 @@ export default function DashboardPage() {
     '3年': false,
   });
   const [openSubCategories, setOpenSubCategories] = useState<{ [key: string]: boolean }>({});
+  const [expandedArticles, setExpandedArticles] = useState<{ [key: number]: boolean }>({});
 
   const toggleCategory = (category: string) => {
     setOpenCategories(prev => ({
@@ -44,6 +45,21 @@ export default function DashboardPage() {
       ...prev,
       [subCategory]: !prev[subCategory]
     }));
+  };
+
+  const toggleArticle = (articleId: number) => {
+    setExpandedArticles(prev => ({
+      ...prev,
+      [articleId]: !prev[articleId]
+    }));
+  };
+
+  const isNewArticle = (createdAt: string) => {
+    const articleDate = new Date(createdAt);
+    const now = new Date();
+    const diffTime = now.getTime() - articleDate.getTime();
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    return diffDays <= 7; // 7日以内なら新着
   };
 
   useEffect(() => {
@@ -147,38 +163,73 @@ export default function DashboardPage() {
             </div>
             <div className="divide-y divide-gray-200">
               {articles.length > 0 ? (
-                articles.map((article) => (
-                  <div key={article.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                    <div className="flex justify-between items-start">
-                      <h3 className="text-base font-medium text-gray-900">{article.title}</h3>
-                      <span className="text-xs text-gray-500">
-                        {new Date(article.created_at).toLocaleDateString('ja-JP')}
-                      </span>
+                articles.map((article) => {
+                  const isExpanded = expandedArticles[article.id];
+                  const isNew = isNewArticle(article.created_at);
+                  
+                  return (
+                    <div key={article.id} className="hover:bg-gray-50 transition-colors">
+                      {/* タイトル部分（常に表示・クリック可能） */}
+                      <button
+                        onClick={() => toggleArticle(article.id)}
+                        className="w-full px-6 py-4 text-left flex items-center justify-between gap-3"
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <h3 className="text-base font-medium text-gray-900 truncate">{article.title}</h3>
+                          {isNew && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-pink-400 to-pink-500 text-white shadow-sm animate-pulse">
+                              ✨ New
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <span className="text-xs text-gray-500">
+                            {new Date(article.created_at).toLocaleDateString('ja-JP')}
+                          </span>
+                          <span className="text-gray-400">
+                            {isExpanded ? (
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                              </svg>
+                            ) : (
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            )}
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* 展開時のコンテンツ */}
+                      {isExpanded && (
+                        <div className="px-6 pb-4 space-y-2">
+                          <p className="text-sm text-gray-600 whitespace-pre-wrap">{article.content}</p>
+                          <p className="text-xs text-gray-500">投稿者: {article.author}</p>
+                          
+                          {/* 添付PDF表示 */}
+                          {article.documents && article.documents.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {article.documents.map((doc: any, index: number) => (
+                                <a
+                                  key={index}
+                                  href={doc.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                                >
+                                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                  {doc.name}
+                                </a>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <p className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">{article.content}</p>
-                    <p className="mt-2 text-xs text-gray-500">投稿者: {article.author}</p>
-                    
-                    {/* 添付PDF表示 */}
-                    {article.documents && article.documents.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {article.documents.map((doc: any, index: number) => (
-                          <a
-                            key={index}
-                            href={doc.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                          >
-                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            {doc.name}
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="px-6 py-8 text-center text-gray-500">
                   現在、お知らせはありません
