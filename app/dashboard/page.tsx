@@ -32,6 +32,14 @@ export default function DashboardPage() {
   });
   const [openSubCategories, setOpenSubCategories] = useState<{ [key: string]: boolean }>({});
   const [expandedArticles, setExpandedArticles] = useState<{ [key: number]: boolean }>({});
+  
+  // メール登録フォーム用
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [emailForm, setEmailForm] = useState({
+    studentName: '',
+    email: '',
+    grade: ''
+  });
 
   const toggleCategory = (category: string) => {
     setOpenCategories(prev => ({
@@ -115,6 +123,40 @@ export default function DashboardPage() {
     }
   };
 
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!emailForm.studentName || !emailForm.email || !emailForm.grade) {
+      alert('全ての項目を入力してください');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/subscribers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentName: emailForm.studentName,
+          email: emailForm.email,
+          grade: emailForm.grade
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert('メールアドレスを登録しました！\n更新情報をお送りします。');
+        setEmailForm({ studentName: '', email: '', grade: '' });
+        setShowEmailForm(false);
+      } else {
+        alert(data.error || '登録に失敗しました');
+      }
+    } catch (error) {
+      console.error('Email registration error:', error);
+      alert('登録に失敗しました');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -158,9 +200,81 @@ export default function DashboardPage() {
         {/* お知らせ・更新情報 */}
         <div className="mb-8">
           <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-            <div className="px-6 py-4 border-b border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-lg font-semibold text-gray-900">お知らせ・更新情報</h2>
+              <button
+                onClick={() => setShowEmailForm(!showEmailForm)}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                更新通知を受け取る
+              </button>
             </div>
+
+            {/* メール登録フォーム */}
+            {showEmailForm && (
+              <div className="px-6 py-4 bg-green-50 border-b border-green-200">
+                <form onSubmit={handleEmailSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      お子様のお名前
+                    </label>
+                    <input
+                      type="text"
+                      value={emailForm.studentName}
+                      onChange={(e) => setEmailForm({ ...emailForm, studentName: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      placeholder="山田 太郎"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      メールアドレス
+                    </label>
+                    <input
+                      type="email"
+                      value={emailForm.email}
+                      onChange={(e) => setEmailForm({ ...emailForm, email: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      placeholder="example@email.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      学年
+                    </label>
+                    <select
+                      value={emailForm.grade}
+                      onChange={(e) => setEmailForm({ ...emailForm, grade: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="">選択してください</option>
+                      <option value="1年">1年</option>
+                      <option value="2年">2年</option>
+                      <option value="3年">3年</option>
+                    </select>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      type="submit"
+                      className="flex-1 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors"
+                    >
+                      登録する
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowEmailForm(false)}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                    >
+                      キャンセル
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+
             <div className="divide-y divide-gray-200">
               {articles.length > 0 ? (
                 articles.map((article) => {

@@ -354,8 +354,14 @@ export default function AdminPage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [users, setUsers] = useState<DBUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'articles' | 'users' | 'links' | 'login-history'>('articles');
+  const [activeTab, setActiveTab] = useState<'articles' | 'users' | 'links' | 'login-history' | 'email'>('articles');
   const [loginHistory, setLoginHistory] = useState<any[]>([]);
+
+  // メール関連
+  const [subscribers, setSubscribers] = useState<any[]>([]);
+  const [emailHistory, setEmailHistory] = useState<any[]>([]);
+  const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   // 記事追加フォーム
   const [newArticle, setNewArticle] = useState({ 
@@ -422,6 +428,8 @@ export default function AdminPage() {
         fetchUsers();
         fetchLinks();
         fetchLoginHistory();
+        fetchSubscribers();
+        fetchEmailHistory();
       } else {
         router.push('/');
       }
@@ -470,6 +478,26 @@ export default function AdminPage() {
       setLoginHistory(data.history || []);
     } catch (error) {
       console.error('Login history fetch error:', error);
+    }
+  };
+
+  const fetchSubscribers = async () => {
+    try {
+      const response = await fetch('/api/admin/subscribers');
+      const data = await response.json();
+      setSubscribers(Array.isArray(data) ? data : (data.subscribers || []));
+    } catch (error) {
+      console.error('Subscribers fetch error:', error);
+    }
+  };
+
+  const fetchEmailHistory = async () => {
+    try {
+      const response = await fetch('/api/admin/email/history');
+      const data = await response.json();
+      setEmailHistory(Array.isArray(data) ? data : (data.history || []));
+    } catch (error) {
+      console.error('Email history fetch error:', error);
     }
   };
 
@@ -720,6 +748,57 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteSubscriber = async (id: number) => {
+    if (!confirm('この登録者を削除しますか？')) return;
+
+    try {
+      const response = await fetch(`/api/admin/subscribers?id=${id}`, { method: 'DELETE' });
+      if (response.ok) {
+        fetchSubscribers();
+        alert('登録者を削除しました');
+      } else {
+        alert('削除に失敗しました');
+      }
+    } catch (error) {
+      alert('エラーが発生しました');
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (selectedGrades.length === 0) {
+      alert('送信する学年を選択してください');
+      return;
+    }
+
+    if (!confirm(`選択した学年（${selectedGrades.join('、')}）にメールを送信しますか？`)) return;
+
+    setSendingEmail(true);
+    try {
+      const response = await fetch('/api/admin/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetGrades: selectedGrades }),
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        alert(`${data.recipientCount}件のメールを送信しました`);
+        setSelectedGrades([]);
+        fetchEmailHistory();
+      } else {
+        const message = data?.details
+          ? `${data.error || 'メール送信に失敗しました'}\n詳細: ${data.details}`
+          : (data.error || 'メール送信に失敗しました');
+        alert(message);
+      }
+    } catch (error) {
+      alert('エラーが発生しました');
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
@@ -919,6 +998,16 @@ export default function AdminPage() {
               }`}
             >
               ログイン履歴
+            </button>
+            <button
+              onClick={() => setActiveTab('email')}
+              className={`pb-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'email'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              メール配信
             </button>
           </nav>
         </div>
@@ -1432,6 +1521,204 @@ export default function AdminPage() {
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'email' && (
+          <div className="space-y-6">
+            {/* メール送信セクション */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">メール配信</h2>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    送信対象学年
+                  </label>
+                  <div className="flex flex-wrap gap-3">
+                    {['1年', '2年', '3年', '全学年'].map((grade) => (
+                      <label key={grade} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedGrades.includes(grade)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedGrades([...selectedGrades, grade]);
+                            } else {
+                              setSelectedGrades(selectedGrades.filter(g => g !== grade));
+                            }
+                          }}
+                          className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">{grade}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    送信内容プレビュー
+                  </label>
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <p className="text-sm font-semibold text-gray-900 mb-2">
+                      件名: ポータルサイトが更新されました
+                    </p>
+                    <div className="text-sm text-gray-700 space-y-2">
+                      <p>保護者の皆様</p>
+                      <p>ポータルサイトが更新されました。</p>
+                      <p className="font-medium">↓ポータルサイトログインURL↓</p>
+                      <p className="text-blue-600 underline font-semibold">
+                        https://databaselink.vercel.app
+                      </p>
+                      <p className="text-xs text-gray-500 mt-4">
+                        ※このメールに心当たりがない場合は、学校までお問い合わせください。
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        ※こちらのアドレスは送信専用です。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <button
+                    onClick={handleSendEmail}
+                    disabled={sendingEmail || selectedGrades.length === 0}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed font-medium"
+                  >
+                    {sendingEmail ? '送信中...' : 'メール送信'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 登録者一覧 */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">メール登録者一覧</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        学生名
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        メールアドレス
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        学年
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        登録日時
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        操作
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {subscribers.length > 0 ? (
+                      subscribers.map((subscriber) => (
+                        <tr key={subscriber.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {subscriber.student_name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {subscriber.email}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {subscriber.grade}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(subscriber.created_at).toLocaleString('ja-JP')}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                            <button
+                              onClick={() => handleDeleteSubscriber(subscriber.id)}
+                              className="text-red-600 hover:text-red-900 font-medium"
+                            >
+                              削除
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                          登録者がいません
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {subscribers.length > 0 && (
+                <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                  <p className="text-sm text-gray-600">
+                    合計 <span className="font-semibold">{subscribers.length}</span> 件の登録
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* 送信履歴 */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">送信履歴</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        送信日時
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        対象学年
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        送信件数
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        送信者
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {emailHistory.length > 0 ? (
+                      emailHistory.map((history) => (
+                        <tr key={history.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {new Date(history.sent_at).toLocaleString('ja-JP')}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {Array.isArray(history.target_grades) 
+                              ? history.target_grades.join('、') 
+                              : history.target_grades}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {history.recipient_count}件
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {history.sent_by}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                          送信履歴がありません
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
