@@ -360,6 +360,7 @@ export default function AdminPage() {
   // メール関連
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [emailHistory, setEmailHistory] = useState<any[]>([]);
+  const [selectedSubscriberIds, setSelectedSubscriberIds] = useState<number[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
   const [sendingEmail, setSendingEmail] = useState(false);
 
@@ -755,10 +756,51 @@ export default function AdminPage() {
       const response = await fetch(`/api/admin/subscribers?id=${id}`, { method: 'DELETE' });
       if (response.ok) {
         fetchSubscribers();
+        setSelectedSubscriberIds((prev) => prev.filter((itemId) => itemId !== id));
         alert('登録者を削除しました');
       } else {
         alert('削除に失敗しました');
       }
+    } catch (error) {
+      alert('エラーが発生しました');
+    }
+  };
+
+  const toggleSubscriberSelection = (id: number, checked: boolean) => {
+    setSelectedSubscriberIds((prev) =>
+      checked ? [...prev, id] : prev.filter((itemId) => itemId !== id)
+    );
+  };
+
+  const toggleAllSubscribers = (checked: boolean) => {
+    setSelectedSubscriberIds(checked ? subscribers.map((s) => s.id) : []);
+  };
+
+  const handleBulkDeleteSubscribers = async () => {
+    if (selectedSubscriberIds.length === 0) {
+      alert('削除する登録者を選択してください');
+      return;
+    }
+
+    if (!confirm(`選択した${selectedSubscriberIds.length}件を削除しますか？`)) return;
+
+    try {
+      const results = await Promise.all(
+        selectedSubscriberIds.map((id) =>
+          fetch(`/api/admin/subscribers?id=${id}`, { method: 'DELETE' })
+        )
+      );
+
+      const failed = results.filter((res) => !res.ok).length;
+
+      if (failed === 0) {
+        alert('選択した登録者を削除しました');
+      } else {
+        alert(`一部の削除に失敗しました（失敗: ${failed}件）`);
+      }
+
+      setSelectedSubscriberIds([]);
+      fetchSubscribers();
     } catch (error) {
       alert('エラーが発生しました');
     }
@@ -1597,13 +1639,35 @@ export default function AdminPage() {
 
             {/* 登録者一覧 */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900">メール登録者一覧</h2>
+                <div className="flex items-center gap-3">
+                  {selectedSubscriberIds.length > 0 && (
+                    <span className="text-sm text-gray-600">
+                      選択中: {selectedSubscriberIds.length}件
+                    </span>
+                  )}
+                  <button
+                    onClick={handleBulkDeleteSubscribers}
+                    disabled={selectedSubscriberIds.length === 0}
+                    className="px-4 py-2 text-sm font-medium text-red-700 border border-red-300 rounded-md hover:bg-red-50 disabled:text-gray-400 disabled:border-gray-300 disabled:cursor-not-allowed"
+                  >
+                    選択削除
+                  </button>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <input
+                          type="checkbox"
+                          checked={subscribers.length > 0 && selectedSubscriberIds.length === subscribers.length}
+                          onChange={(e) => toggleAllSubscribers(e.target.checked)}
+                          className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                        />
+                      </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         学生名
                       </th>
@@ -1625,6 +1689,14 @@ export default function AdminPage() {
                     {subscribers.length > 0 ? (
                       subscribers.map((subscriber) => (
                         <tr key={subscriber.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <input
+                              type="checkbox"
+                              checked={selectedSubscriberIds.includes(subscriber.id)}
+                              onChange={(e) => toggleSubscriberSelection(subscriber.id, e.target.checked)}
+                              className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                            />
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {subscriber.student_name}
                           </td>
@@ -1649,7 +1721,7 @@ export default function AdminPage() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                           登録者がいません
                         </td>
                       </tr>
