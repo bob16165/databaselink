@@ -356,6 +356,10 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'articles' | 'users' | 'links' | 'login-history' | 'email'>('articles');
   const [loginHistory, setLoginHistory] = useState<any[]>([]);
+  const [selectedStartYear, setSelectedStartYear] = useState<number>(new Date().getFullYear());
+  const [selectedStartMonth, setSelectedStartMonth] = useState<number>(new Date().getMonth() + 1);
+  const [selectedEndYear, setSelectedEndYear] = useState<number>(new Date().getFullYear());
+  const [selectedEndMonth, setSelectedEndMonth] = useState<number>(new Date().getMonth() + 1);
 
   // メール関連
   const [subscribers, setSubscribers] = useState<any[]>([]);
@@ -472,9 +476,13 @@ export default function AdminPage() {
     }
   };
 
-  const fetchLoginHistory = async () => {
+  const fetchLoginHistory = async (startYear?: number, startMonth?: number, endYear?: number, endMonth?: number) => {
     try {
-      const response = await fetch('/api/login-history?all=true&limit=500');
+      const sy = startYear || selectedStartYear;
+      const sm = startMonth || selectedStartMonth;
+      const ey = endYear || selectedEndYear;
+      const em = endMonth || selectedEndMonth;
+      const response = await fetch(`/api/login-history?all=true&limit=500&startYear=${sy}&startMonth=${sm}&endYear=${ey}&endMonth=${em}`);
       const data = await response.json();
       setLoginHistory(data.history || []);
     } catch (error) {
@@ -524,10 +532,11 @@ export default function AdminPage() {
     const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
-    const timestamp = new Date().toISOString().slice(0, 10);
+    const startMonthStr = String(selectedStartMonth).padStart(2, '0');
+    const endMonthStr = String(selectedEndMonth).padStart(2, '0');
     
     link.setAttribute('href', url);
-    link.setAttribute('download', `login_history_${timestamp}.csv`);
+    link.setAttribute('download', `login_history_${selectedStartYear}-${startMonthStr}_to_${selectedEndYear}-${endMonthStr}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -1498,14 +1507,99 @@ export default function AdminPage() {
         {activeTab === 'login-history' && (
           <div>
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-gray-900">ログイン履歴</h2>
-                <button
-                  onClick={downloadLoginHistoryCSV}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium"
-                >
-                  CSVダウンロード
-                </button>
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex justify-between items-center gap-4 flex-wrap">
+                  <h2 className="text-lg font-semibold text-gray-900">ログイン履歴</h2>
+                  <div className="flex gap-4 items-center flex-wrap">
+                    {/* 開始月 */}
+                    <div className="flex gap-2 items-center">
+                      <label className="text-sm font-medium text-gray-700 whitespace-nowrap">開始:</label>
+                      <select
+                        value={selectedStartYear}
+                        onChange={(e) => {
+                          const newYear = parseInt(e.target.value);
+                          setSelectedStartYear(newYear);
+                          fetchLoginHistory(newYear, selectedStartMonth, selectedEndYear, selectedEndMonth);
+                        }}
+                        className="px-3 py-1 border border-gray-300 rounded-md text-sm"
+                      >
+                        {Array.from({ length: 5 }, (_, i) => {
+                          const year = new Date().getFullYear() - 4 + i;
+                          return (
+                            <option key={year} value={year}>{year}</option>
+                          );
+                        })}
+                      </select>
+                      <span className="text-sm text-gray-500">年</span>
+                      <select
+                        value={selectedStartMonth}
+                        onChange={(e) => {
+                          const newMonth = parseInt(e.target.value);
+                          setSelectedStartMonth(newMonth);
+                          fetchLoginHistory(selectedStartYear, newMonth, selectedEndYear, selectedEndMonth);
+                        }}
+                        className="px-3 py-1 border border-gray-300 rounded-md text-sm"
+                      >
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const month = i + 1;
+                          return (
+                            <option key={month} value={month}>{month}</option>
+                          );
+                        })}
+                      </select>
+                      <span className="text-sm text-gray-500">月</span>
+                    </div>
+
+                    {/* セパレータ */}
+                    <span className="text-sm text-gray-400">〜</span>
+
+                    {/* 終了月 */}
+                    <div className="flex gap-2 items-center">
+                      <label className="text-sm font-medium text-gray-700 whitespace-nowrap">終了:</label>
+                      <select
+                        value={selectedEndYear}
+                        onChange={(e) => {
+                          const newYear = parseInt(e.target.value);
+                          setSelectedEndYear(newYear);
+                          fetchLoginHistory(selectedStartYear, selectedStartMonth, newYear, selectedEndMonth);
+                        }}
+                        className="px-3 py-1 border border-gray-300 rounded-md text-sm"
+                      >
+                        {Array.from({ length: 5 }, (_, i) => {
+                          const year = new Date().getFullYear() - 4 + i;
+                          return (
+                            <option key={year} value={year}>{year}</option>
+                          );
+                        })}
+                      </select>
+                      <span className="text-sm text-gray-500">年</span>
+                      <select
+                        value={selectedEndMonth}
+                        onChange={(e) => {
+                          const newMonth = parseInt(e.target.value);
+                          setSelectedEndMonth(newMonth);
+                          fetchLoginHistory(selectedStartYear, selectedStartMonth, selectedEndYear, newMonth);
+                        }}
+                        className="px-3 py-1 border border-gray-300 rounded-md text-sm"
+                      >
+                        {Array.from({ length: 12 }, (_, i) => {
+                          const month = i + 1;
+                          return (
+                            <option key={month} value={month}>{month}</option>
+                          );
+                        })}
+                      </select>
+                      <span className="text-sm text-gray-500">月</span>
+                    </div>
+
+                    <button
+                      onClick={downloadLoginHistoryCSV}
+                      className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium"
+                    >
+                      CSVダウンロード
+                    </button>
+                  </div>
+                </div>
               </div>
               
               <div className="overflow-x-auto">

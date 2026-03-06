@@ -15,8 +15,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get('limit') || '100');
+    const limit = parseInt(searchParams.get('limit') || '500');
     const all = searchParams.get('all') === 'true';
+    const startYear = searchParams.get('startYear');
+    const startMonth = searchParams.get('startMonth');
+    const endYear = searchParams.get('endYear');
+    const endMonth = searchParams.get('endMonth');
 
     // 管理者の場合は全ログイン履歴を取得
     if (all) {
@@ -25,7 +29,29 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: '管理者権限が必要です' }, { status: 403 });
       }
       
-      const history = await getAllLoginHistory(limit);
+      let history = await getAllLoginHistory(limit);
+      
+      // 年月範囲でフィルタリング
+      if (startYear && startMonth && endYear && endMonth) {
+        const startYearNum = parseInt(startYear);
+        const startMonthNum = parseInt(startMonth);
+        const endYearNum = parseInt(endYear);
+        const endMonthNum = parseInt(endMonth);
+        
+        history = history.filter(h => {
+          const date = new Date(h.login_time);
+          const year = date.getFullYear();
+          const month = date.getMonth() + 1;
+          
+          // 開始日付以降か確認
+          const isAfterStart = year > startYearNum || (year === startYearNum && month >= startMonthNum);
+          // 終了日付以前か確認
+          const isBeforeEnd = year < endYearNum || (year === endYearNum && month <= endMonthNum);
+          
+          return isAfterStart && isBeforeEnd;
+        });
+      }
+      
       return NextResponse.json({ history });
     }
 
